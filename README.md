@@ -1,2 +1,13 @@
-# simoouahbi.github.io
-🌍 **The official personal website of Mohamed Ouahbi** — Full-Stack Developer, Entrepreneur, and Founder of ECO. Showcasing my journey, projects, technologies, innovations, and vision for building the future through creativity, engineering, and AI. 🚀
+# Simoouahbi Portfolio
+
+Personal portfolio template for [simoouahbi.github.io](https://simoouahbi.github.io/).
+Profile details, media, and public tracks are intentionally left empty.
+
+## Development
+
+```sh
+npm install
+npm run dev
+```
+
+Build the GitHub Pages site with `npm run build`.
