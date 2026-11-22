@@ -78,6 +78,7 @@ function ConfiguredMusicPlayer() {
   const fileInput = useRef<HTMLInputElement>(null);
   const restoredTime = useRef(0);
   const restoredTrack = useRef('');
+  const shouldAutoplayOnLoad = useRef(true);
   const playAfterLoad = useRef(false);
   const playTrackRef = useRef<() => void>(() => {});
   const activeTrackRef = useRef<PlayerTrack | undefined>(undefined);
@@ -122,6 +123,7 @@ function ConfiguredMusicPlayer() {
         const saved = readSavedPlayer();
         restoredTrack.current = saved?.trackId ?? '';
         restoredTime.current = saved?.currentTime ?? 0;
+        shouldAutoplayOnLoad.current = saved?.wasPlaying ?? true;
         setNeedsResume(Boolean(saved?.wasPlaying));
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : 'The music library could not be loaded.');
@@ -250,6 +252,14 @@ function ConfiguredMusicPlayer() {
     }
   }, [activeTrack]);
   playTrackRef.current = () => { void play(); };
+
+  useEffect(() => {
+    if (!isReady || !activeTrack || !shouldAutoplayOnLoad.current) return;
+    const restored = tracks.find((track) => track.id === restoredTrack.current);
+    if (restored && restored.id !== activeTrack.id) return;
+    shouldAutoplayOnLoad.current = false;
+    void play();
+  }, [activeTrack, isReady, play, tracks]);
 
   const savePrivateUrls = (next: PrivateUrlTrack[]) => {
     try {
