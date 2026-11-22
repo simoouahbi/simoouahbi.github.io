@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { ECO_STORAGE_KEYS, readEcoCookie, setEcoCookie, writeSessionPreference } from './clientStorage';
 import {
   ArrowUpRight,
   AudioLines,
@@ -238,7 +239,10 @@ export default function App() {
   const [rightOpen, setRightOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
-      return window.localStorage.getItem('eco-starter:theme') === 'light' ? 'light' : 'dark';
+      const saved = window.localStorage.getItem(ECO_STORAGE_KEYS.theme)
+        ?? readEcoCookie(ECO_STORAGE_KEYS.cookieTheme)
+        ?? window.localStorage.getItem('eco-starter:theme');
+      return saved === 'light' ? 'light' : 'dark';
     } catch {
       return 'dark';
     }
@@ -254,7 +258,9 @@ export default function App() {
         ? 'About | Simoouahbi'
         : 'Simoouahbi | Portfolio';
     try {
-      window.localStorage.setItem('eco-starter:theme', theme);
+      window.localStorage.setItem(ECO_STORAGE_KEYS.theme, theme);
+      setEcoCookie(ECO_STORAGE_KEYS.cookieTheme, theme);
+      writeSessionPreference('theme', theme);
     } catch {
       // The selected theme remains active for this page even if storage is disabled.
     }
