@@ -27,6 +27,65 @@ interface PrivateUrlTrack {
   audioUrl: string;
 }
 
+interface AudioPowerGraph {
+  context: AudioContext;
+  source: MediaElementAudioSourceNode;
+  gain: GainNode;
+  bass: BiquadFilterNode;
+}
+
+function canEnhanceTrack(track: PlayerTrack | undefined) {
+  if (!track) return false;
+  if (track.kind === 'device') return true;
+  try {
+    return new URL(track.src, window.location.href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function createAudioPowerGraph(element: HTMLAudioElement, gainLevel: number, bassLevel: number): AudioPowerGraph {
+  const context = new AudioContext();
+  let source: MediaElementAudioSourceNode | null = null;
+  try {
+    source = context.createMediaElementSource(element);
+    const bass = context.createBiquadFilter();
+    bass.type = 'lowshelf';
+    bass.frequency.value = 110;
+    bass.gain.value = bassLevel;
+    const clarity = context.createBiquadFilter();
+    clarity.type = 'peaking';
+    clarity.frequency.value = 2800;
+    clarity.Q.value = 0.9;
+    clarity.gain.value = 2;
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 12;
+    compressor.ratio.value = 6;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    const gain = context.createGain();
+    gain.gain.value = gainLevel;
+    const limiter = context.createDynamicsCompressor();
+    limiter.threshold.value = -1.5;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.08;
+    source.connect(bass);
+    bass.connect(clarity);
+    clarity.connect(compressor);
+    compressor.connect(gain);
+    gain.connect(limiter);
+    limiter.connect(context.destination);
+    return { context, source, gain, bass };
+  } catch (error) {
+    if (source) source.disconnect();
+    void context.close();
+    throw error;
+  }
+}
+
 function readSavedPlayer(): SavedPlayer | null {
   try {
     const saved = window.localStorage.getItem(PLAYER_KEY);
@@ -82,6 +141,7 @@ function ConfiguredMusicPlayer() {
   const playAfterLoad = useRef(false);
   const playTrackRef = useRef<() => void>(() => {});
   const activeTrackRef = useRef<PlayerTrack | undefined>(undefined);
+  const audioPower = useRef<AudioPowerGraph | null>(null);
   const objectUrls = useRef(new Set<string>());
   const lastSavedSecond = useRef(-1);
   const [deviceTracks, setDeviceTracks] = useState<(StoredDeviceTrack & { src: string })[]>([]);
@@ -90,6 +150,10 @@ function ConfiguredMusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [needsResume, setNeedsResume] = useState(false);
+  const [amplification, setAmplification] = useState(6);
+  const [bassBoost, setBassBoost] = useState(10);
+  const [isEnhanced, setIsEnhanced] = useState(false);
+  const [useNativePlayback, setUseNativePlayback] = useState(false);
   const [isShuffleEnabled, setIsShuffleEnabled] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isOpen, setIsOpen] = useState(false);
@@ -105,7 +169,71 @@ function ConfiguredMusicPlayer() {
   ], [deviceTracks, privateUrls]);
   const activeTrack = tracks.find((track) => track.id === activeId) ?? tracks[0];
   const activeIndex = Math.max(0, tracks.findIndex((track) => track.id === activeTrack?.id));
+  const enhancementSupported = canEnhanceTrack(activeTrack);
+  const audioProcessingEnabled = enhancementSupported && !useNativePlayback;
   activeTrackRef.current = activeTrack;
+
+  const switchToNativePlayback = useCallback(() => {
+    const element = audio.current;
+    if (element && activeTrack) {
+      restoredTrack.current = activeTrack.id;
+      restoredTime.current = Number.isFinite(element.currentTime) ? element.currentTime : 0;
+      playAfterLoad.current = !element.paused;
+    }
+    setUseNativePlayback(true);
+    setIsEnhanced(false);
+    setMessage('Audio enhancement unavailable; switching to standard playback.');
+  }, [activeTrack]);
+
+  const enableAudioEnhancement = useCallback((gainLevel = amplification, bassLevel = bassBoost) => {
+    const element = audio.current;
+    if (!element || !activeTrack || useNativePlayback) return false;
+    if (!canEnhanceTrack(activeTrack)) {
+      setMessage('Power mode is unavailable for this external audio link.');
+      return false;
+    }
+    try {
+      let graph = audioPower.current;
+      if (!graph) {
+        graph = createAudioPowerGraph(element, gainLevel, bassLevel);
+        audioPower.current = graph;
+      }
+      graph.gain.gain.setTargetAtTime(gainLevel, graph.context.currentTime, 0.04);
+      graph.bass.gain.setTargetAtTime(bassLevel, graph.context.currentTime, 0.04);
+      if (graph.context.state === 'suspended') void graph.context.resume().catch(switchToNativePlayback);
+      setIsEnhanced(true);
+      setMessage(`Power mode: ${gainLevel.toFixed(1)}× amplification, +${bassLevel} dB bass.`);
+      return true;
+    } catch (error) {
+      const graph = audioPower.current;
+      if (graph) {
+        graph.source.disconnect();
+        void graph.context.close();
+        audioPower.current = null;
+      }
+      switchToNativePlayback();
+      if (error instanceof Error) setMessage(`Power mode failed: ${error.message}. Standard playback restored.`);
+      return false;
+    }
+  }, [activeTrack, amplification, bassBoost, switchToNativePlayback, useNativePlayback]);
+
+  useEffect(() => {
+    if (audioProcessingEnabled) return;
+    const graph = audioPower.current;
+    if (!graph) return;
+    graph.source.disconnect();
+    audioPower.current = null;
+    void graph.context.close();
+    setIsEnhanced(false);
+  }, [audioProcessingEnabled]);
+
+  useEffect(() => () => {
+    const graph = audioPower.current;
+    if (!graph) return;
+    graph.source.disconnect();
+    void graph.context.close();
+    audioPower.current = null;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -155,7 +283,7 @@ function ConfiguredMusicPlayer() {
       playAfterLoad.current = false;
       window.setTimeout(() => playTrackRef.current(), 0);
     };
-  }, [activeTrack?.id, activeTrack?.src]);
+  }, [activeTrack?.id, activeTrack?.src, audioProcessingEnabled]);
 
   useEffect(() => () => {
     objectUrls.current.forEach((src) => URL.revokeObjectURL(src));
@@ -212,9 +340,14 @@ function ConfiguredMusicPlayer() {
     selectTrack(nextIndex, continuePlaying);
   }, [activeIndex, isShuffleEnabled, selectTrack, tracks.length]);
 
-  const play = useCallback(async () => {
+  const play = useCallback(async (enhance = false) => {
     const element = audio.current;
     if (!element || !activeTrack) return;
+    const enhancementStarted = enhance && enableAudioEnhancement();
+    if (enhance && !enhancementStarted && enhancementSupported && !useNativePlayback) {
+      playAfterLoad.current = true;
+      return;
+    }
     try {
       if (element.getAttribute('src') !== activeTrack.src || element.readyState < 1) {
         const metadataLoaded = new Promise<void>((resolve, reject) => {
@@ -261,8 +394,8 @@ function ConfiguredMusicPlayer() {
         ? 'Autoplay was blocked. Click or tap anywhere to start music.'
         : 'This track could not be played. Check that the audio file or URL is available.');
     }
-  }, [activeTrack]);
-  playTrackRef.current = () => { void play(); };
+  }, [activeTrack, enableAudioEnhancement, enhancementSupported, useNativePlayback]);
+  playTrackRef.current = () => { void play(true); };
 
   useEffect(() => {
     if (!isReady || !activeTrack || !shouldAutoplayOnLoad.current) return;
@@ -273,15 +406,15 @@ function ConfiguredMusicPlayer() {
   }, [activeTrack, isReady, play, tracks]);
 
   useEffect(() => {
-    if (!needsResume) return;
-    const resumeAfterInteraction = (event: Event) => {
+    const resumeAfterInteraction = (event: PointerEvent) => {
+      if (enhancementSupported) enableAudioEnhancement();
       const target = event.target;
-      if (target instanceof Node && audio.current?.parentElement?.contains(target)) return;
-      playTrackRef.current();
+      const clickedPlayer = target instanceof Node && audio.current?.parentElement?.contains(target);
+      if (needsResume && !clickedPlayer) playTrackRef.current();
     };
-    window.addEventListener('pointerdown', resumeAfterInteraction);
+    window.addEventListener('pointerdown', resumeAfterInteraction, { once: true });
     return () => window.removeEventListener('pointerdown', resumeAfterInteraction);
-  }, [needsResume]);
+  }, [enableAudioEnhancement, enhancementSupported, needsResume]);
 
   const savePrivateUrls = (next: PrivateUrlTrack[]) => {
     try {
@@ -370,7 +503,7 @@ function ConfiguredMusicPlayer() {
       audio.current.pause();
       return;
     }
-    void play();
+    void play(true);
   };
 
   const stopPlayback = () => {
@@ -408,6 +541,7 @@ function ConfiguredMusicPlayer() {
   return (
     <div className="music-player" id="listen">
       <audio
+        key={audioProcessingEnabled ? 'power-audio' : 'native-audio'}
         ref={audio}
         loop={tracks.length === 1}
         preload="none"
@@ -435,6 +569,31 @@ function ConfiguredMusicPlayer() {
             <button type="button" className="icon-button" aria-label="Close music library" onClick={() => setIsOpen(false)}><X size={18} /></button>
           </div>
           <p className="privacy-note">Your device tracks and saved links stay in this browser. Nothing is uploaded or synced to an account.</p>
+          <div className="audio-enhancer">
+            <label htmlFor="music-amplifier">
+              <Volume2 size={17} aria-hidden="true" />
+              <span><strong>Power amplifier · {amplification.toFixed(1)}×</strong><small>{isEnhanced ? 'Power bass and loudness are on' : 'Strong loudness boost with peak limiting'}</small></span>
+            </label>
+            <input id="music-amplifier" type="range" min="1" max="10" step="0.25" value={amplification} disabled={!audioProcessingEnabled} aria-label="Music amplification" onChange={(event) => {
+              const next = Number(event.currentTarget.value);
+              setAmplification(next);
+              if (audioProcessingEnabled) enableAudioEnhancement(next);
+            }} />
+            <label htmlFor="music-bass-boost" className="bass-boost-label">
+              <span><strong>Bass boost · +{bassBoost} dB</strong><small>Low-frequency boost at 110 Hz</small></span>
+            </label>
+            <input id="music-bass-boost" type="range" min="0" max="18" step="1" value={bassBoost} disabled={!audioProcessingEnabled} aria-label="Bass boost" onChange={(event) => {
+              const next = Number(event.currentTarget.value);
+              setBassBoost(next);
+              if (audioProcessingEnabled) enableAudioEnhancement(amplification, next);
+            }} />
+            <button type="button" className="secondary-button power-preset" onClick={() => {
+              setAmplification(10);
+              setBassBoost(18);
+              if (audioProcessingEnabled) enableAudioEnhancement(10, 18);
+            }}>MAX POWER · 10× + 18 dB BASS</button>
+            <small className="audio-enhancer-note">Strong compression raises average loudness; a peak limiter controls spikes. Start with low device volume.</small>
+          </div>
           <div className="track-list">
             {tracks.length ? tracks.map((track, index) => (
               <div className={`track-row ${track.id === activeTrack?.id ? 'selected' : ''}`} key={track.id}>
