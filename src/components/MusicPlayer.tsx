@@ -123,7 +123,7 @@ function ConfiguredMusicPlayer() {
         const saved = readSavedPlayer();
         restoredTrack.current = saved?.trackId ?? '';
         restoredTime.current = saved?.currentTime ?? 0;
-        shouldAutoplayOnLoad.current = saved?.wasPlaying ?? true;
+        shouldAutoplayOnLoad.current = true;
         setNeedsResume(Boolean(saved?.wasPlaying));
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : 'The music library could not be loaded.');
@@ -173,8 +173,17 @@ function ConfiguredMusicPlayer() {
         setMessage(error instanceof Error ? error.message : 'The playback position could not be saved.');
       }
     };
+    const saveWhenHidden = () => {
+      if (document.visibilityState === 'hidden') saveBeforeLeaving();
+    };
     window.addEventListener('pagehide', saveBeforeLeaving);
-    return () => window.removeEventListener('pagehide', saveBeforeLeaving);
+    window.addEventListener('beforeunload', saveBeforeLeaving);
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    return () => {
+      window.removeEventListener('pagehide', saveBeforeLeaving);
+      window.removeEventListener('beforeunload', saveBeforeLeaving);
+      document.removeEventListener('visibilitychange', saveWhenHidden);
+    };
   }, []);
 
   const selectTrack = useCallback((index: number, continuePlaying = false) => {
@@ -246,8 +255,10 @@ function ConfiguredMusicPlayer() {
       setNeedsResume(false);
       setMessage('');
     } catch (error) {
-      setMessage(error instanceof Error && error.name === 'NotAllowedError'
-        ? 'Press Play to resume. Your browser blocks automatic playback.'
+      const autoplayBlocked = error instanceof Error && error.name === 'NotAllowedError';
+      setNeedsResume(autoplayBlocked);
+      setMessage(autoplayBlocked
+        ? 'Autoplay was blocked. Click or tap anywhere to start music.'
         : 'This track could not be played. Check that the audio file or URL is available.');
     }
   }, [activeTrack]);
@@ -260,6 +271,17 @@ function ConfiguredMusicPlayer() {
     shouldAutoplayOnLoad.current = false;
     void play();
   }, [activeTrack, isReady, play, tracks]);
+
+  useEffect(() => {
+    if (!needsResume) return;
+    const resumeAfterInteraction = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && audio.current?.parentElement?.contains(target)) return;
+      playTrackRef.current();
+    };
+    window.addEventListener('pointerdown', resumeAfterInteraction);
+    return () => window.removeEventListener('pointerdown', resumeAfterInteraction);
+  }, [needsResume]);
 
   const savePrivateUrls = (next: PrivateUrlTrack[]) => {
     try {
@@ -387,9 +409,13 @@ function ConfiguredMusicPlayer() {
     <div className="music-player" id="listen">
       <audio
         ref={audio}
+        loop={tracks.length === 1}
         preload="none"
         onTimeUpdate={onTimeUpdate}
-        onPlay={() => setIsPlaying(true)}
+        onPlay={() => {
+          setIsPlaying(true);
+          setNeedsResume(false);
+        }}
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
           setIsPlaying(false);
@@ -465,7 +491,7 @@ function ConfiguredMusicPlayer() {
       <div className="player-progress" aria-label="Track progress">
         <span style={{ width: `${progress * 100}%` }} />
       </div>
-      <span className="visually-hidden" role="status">{message || (needsResume ? 'Playback position restored. Press Play to resume.' : '')}</span>
+      <span className="visually-hidden" role="status">{message || (needsResume ? 'Playback position restored. Click or tap anywhere to resume.' : '')}</span>
     </div>
   );
 }
