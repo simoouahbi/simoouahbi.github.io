@@ -1,4 +1,15 @@
-MIT License
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License badge">
+  </a>
+  <a href="https://www.0661619230.com">
+    <img src="assets/eco-logo-black.png" alt="ECO logo" width="160">
+  </a>
+</p>
+
+<p align="center"><sub>The MIT badge identifies the license; it does not imply affiliation with or endorsement by the Massachusetts Institute of Technology.</sub></p>
+
+# MIT License
 
 Copyright (c) 2026 simoouahbi
 
@@ -19,15 +30,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-<p align="center">
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License badge">
-  </a>
-  <a href="https://www.0661619230.com">
-    <img src="assets/eco-logo-black.png" alt="ECO logo" width="160">
-  </a>
-</p>
 
 ---
 
