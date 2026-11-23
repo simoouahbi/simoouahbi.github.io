@@ -1,17 +1,63 @@
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--                    ECO-SYS LICENSE HEADER                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
 <p align="center">
-  <a href="https://fr.wikipedia.org/wiki/Massachusetts_Institute_of_Technology">
-    <img src="assets/mit-logo.webp" alt="MIT logo" width="140">
-  </a>
   <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License badge">
+    <img src="assets/mit-logo.webp"
+         alt="MIT License"
+         width="116"
+         height="116"
+         style="object-fit:contain; vertical-align:middle; margin:12px 30px;">
   </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/OPEN_SOURCE-MIT_LICENSE-2563EB?style=for-the-badge&logo=opensourceinitiative&logoColor=white"
+         alt="MIT Open Source License"
+         height="36"
+         style="vertical-align:middle; margin:12px 24px;">
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://www.0661619230.com">
-    <img src="assets/eco-logo-white.png" alt="ECO-SYS-master badge" height="64">
+    <img src="assets/eco-logo-white.png"
+         alt="ECO-SYS"
+         width="190"
+         height="88"
+         style="object-fit:contain; vertical-align:middle; margin:12px 30px;">
   </a>
 </p>
 
-<p align="center"><sub>The MIT logo is shown only for identification; this project is not affiliated with or endorsed by the Massachusetts Institute of Technology.</sub></p>
+<p align="center">
+  <strong>MIT OPEN SOURCE LICENSE</strong>
+  <br>
+  <sub>Powered by the principles of open collaboration, transparency, and innovation.</sub>
+</p>
 
+<p align="center">
+  <strong>ECO-SYS</strong> · An independent ecosystem by <a href="https://github.com/ADALIGO">ADALIGO</a>
+  <br>
+  <sub>Open source foundation · Independent development · Community collaboration</sub>
+</p>
+
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT">MIT License</a>
+  &nbsp;•&nbsp;
+  <a href="https://www.0661619230.com">Official ECO-SYS Website</a>
+  &nbsp;•&nbsp;
+  <a href="https://github.com/ADALIGO">ECO-SYS Owner</a>
+</p>
+
+<p align="center">
+  <sub>
+    The MIT logo is displayed for identification purposes only.
+    This project is independent and is not affiliated with, sponsored by,
+    or endorsed by the Massachusetts Institute of Technology (MIT).
+  </sub>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--                      END LICENSE HEADER                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
 # MIT License
 
 Copyright (c) 2026 simoouahbi
