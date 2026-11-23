@@ -38,7 +38,9 @@ function ExpandableText({ text, lines }: { text: string; lines: 1 | 2 | 3 }) {
 export default function PortfolioVideoCard({ video }: { video: PortfolioVideo }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const { isMuted, toggleMute } = usePortfolioVideoMute();
+  const { activeVideoId, toggleMute } = usePortfolioVideoMute();
+  const videoId = video.src ?? video.title;
+  const isMuted = activeVideoId !== videoId;
 
   useEffect(() => {
     const element = videoRef.current;
@@ -100,7 +102,7 @@ export default function PortfolioVideoCard({ video }: { video: PortfolioVideo })
           </button>
           <button
             type="button"
-            onClick={toggleMute}
+            onClick={() => toggleMute(videoId)}
             aria-label={isMuted ? `Unmute ${video.title}` : `Mute ${video.title}`}
           >
             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
