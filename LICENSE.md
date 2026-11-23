@@ -3,26 +3,27 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 
 <p align="center">
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="assets/mit-logo.webp"
-         alt="MIT License"
+  <a href="https://github.com/simoouahbiGHALINOA">
+    <img src="assets/GIT.png"
+         alt="Git"
+         width="116"
+         height="116"
+         style="object-fit:contain; vertical-align:middle; margin:12px 30px;">
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://www.0661619230.com">
+    <img src="assets/LOGONFD.png"
+         alt="ECO-SYS"
          width="116"
          height="116"
          style="object-fit:contain; vertical-align:middle; margin:12px 30px;">
   </a>
   &nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/OPEN_SOURCE-MIT_LICENSE-2563EB?style=for-the-badge&logo=opensourceinitiative&logoColor=white"
-         alt="MIT Open Source License"
-         height="36"
-         style="vertical-align:middle; margin:12px 24px;">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.0661619230.com">
-    <img src="assets/eco-logo-white.png"
-         alt="ECO-SYS"
-         width="190"
-         height="88"
+    <img src="assets/MIT.png"
+         alt="MIT License"
+         width="116"
+         height="116"
          style="object-fit:contain; vertical-align:middle; margin:12px 30px;">
   </a>
 </p>
@@ -58,6 +59,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!--                      END LICENSE HEADER                        -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
+
 # MIT License
 
 Copyright (c) 2026 simoouahbi
