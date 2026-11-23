@@ -1,13 +1,16 @@
 <p align="center">
+  <a href="https://fr.wikipedia.org/wiki/Massachusetts_Institute_of_Technology">
+    <img src="assets/mit-logo.webp" alt="MIT logo" width="140">
+  </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License badge">
   </a>
   <a href="https://www.0661619230.com">
-    <img src="assets/eco-logo-black.png" alt="ECO logo" width="160">
+    <img src="assets/eco-logo-white.png" alt="ECO-SYS-master badge" height="64">
   </a>
 </p>
 
-<p align="center"><sub>The MIT badge identifies the license; it does not imply affiliation with or endorsement by the Massachusetts Institute of Technology.</sub></p>
+<p align="center"><sub>The MIT logo is shown only for identification; this project is not affiliated with or endorsed by the Massachusetts Institute of Technology.</sub></p>
 
 # MIT License
 
