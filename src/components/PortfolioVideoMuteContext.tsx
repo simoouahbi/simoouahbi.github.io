@@ -1,20 +1,18 @@
 import { createContext, useContext, useState, type PropsWithChildren } from 'react';
 
 type PortfolioVideoMuteContextValue = {
-  activeVideoId: string | null;
-  toggleMute: (videoId: string) => void;
+  isMuted: boolean;
+  toggleMute: () => void;
 };
 
 const PortfolioVideoMuteContext = createContext<PortfolioVideoMuteContextValue | null>(null);
 
 export function PortfolioVideoMuteProvider({ children }: PropsWithChildren) {
-  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
-  const toggleMute = (videoId: string) => {
-    setActiveVideoId((current) => current === videoId ? null : videoId);
-  };
+  const [isMuted, setIsMuted] = useState(true);
+  const toggleMute = () => setIsMuted((current) => !current);
 
   return (
-    <PortfolioVideoMuteContext.Provider value={{ activeVideoId, toggleMute }}>
+    <PortfolioVideoMuteContext.Provider value={{ isMuted, toggleMute }}>
       {children}
     </PortfolioVideoMuteContext.Provider>
   );
