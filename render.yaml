@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: eco-music-sync-simoouahbi
+    runtime: node
+    rootDir: api/music-sync
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: https://adaligo.github.io,https://adamghaliouahbi.github.io,https://khadijachahmoud.github.io,https://noaouahbi.github.io,https://simoouahbi.github.io,http://localhost:5173,http://127.0.0.1:5173

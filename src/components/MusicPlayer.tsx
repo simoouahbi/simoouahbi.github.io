@@ -1,7 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Disc3, Music2, Pause, Play, Plus, Shuffle, SkipBack, SkipForward, Square, Trash2, Upload, Volume2, X } from 'lucide-react';
+import { Disc3, Music2, Pause, Play, Plus, Shuffle, SkipBack, SkipForward, Square, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { PUBLIC_PLAYLIST } from '../music/playlist';
 import { addDeviceTracks, chooseAudioFiles, readDeviceTracks, removeDeviceTrack, type StoredDeviceTrack } from '../music/library';
+import {
+  connectMusicSync,
+  createAdditionalDeviceCode,
+  createMusicSyncClientId,
+  createMusicSyncCode,
+  getMusicSyncCode,
+  isMusicSyncConfigured,
+  parseMusicSyncCode,
+  readMusicSyncCode,
+  saveMusicSyncCode,
+  type MusicSyncConnection,
+  type MusicSyncPairing,
+} from '../music/musicSync';
 
 const PLAYER_KEY = 'eco-starter:player';
 const PRIVATE_URLS_KEY = 'eco-starter:private-urls';
@@ -182,6 +195,17 @@ function ConfiguredMusicPlayer() {
   const [isReady, setIsReady] = useState(false);
   const [needsResume, setNeedsResume] = useState(false);
   const [volumePercent, setVolumePercent] = useState(100);
+  const [isMuted, setIsMuted] = useState(false);
+  const [syncPairing, setSyncPairing] = useState<MusicSyncPairing | null>(readMusicSyncCode);
+  const [syncCodeInput, setSyncCodeInput] = useState('');
+  const [additionalDeviceCode, setAdditionalDeviceCode] = useState('');
+  const [syncConnectionStatus, setSyncConnectionStatus] = useState<'unconfigured' | 'connecting' | 'connected' | 'disconnected'>('unconfigured');
+  const [syncStateReady, setSyncStateReady] = useState(false);
+  const [syncClientId] = useState(createMusicSyncClientId);
+  const syncConnection = useRef<MusicSyncConnection | null>(null);
+  const syncLeaderRef = useRef(false);
+  const syncOwnerRef = useRef<string | null>(null);
+  const playFromSyncRef = useRef<() => void>(() => {});
   const [useNativePlayback, setUseNativePlayback] = useState(false);
   const [isShuffleEnabled, setIsShuffleEnabled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -264,6 +288,19 @@ function ConfiguredMusicPlayer() {
     audioPower.current = null;
     void graph.context.close();
   }, [audioProcessingEnabled]);
+
+  useEffect(() => {
+    const element = audio.current;
+    if (!element) return;
+    element.volume = Math.min(volumePercent, 100) / 100;
+    element.muted = isMuted;
+    if (!syncLeaderRef.current) return;
+    if (volumePercent > 100 && audioProcessingEnabled) {
+      enableAudioEnhancement(volumeGain, volumeBass);
+    } else if (audioPower.current) {
+      enableAudioEnhancement(1, 0);
+    }
+  }, [audioProcessingEnabled, enableAudioEnhancement, isMuted, volumeBass, volumeGain, volumePercent]);
 
   useEffect(() => () => {
     const graph = audioPower.current;
@@ -378,13 +415,35 @@ function ConfiguredMusicPlayer() {
     selectTrack(nextIndex, continuePlaying);
   }, [activeIndex, isShuffleEnabled, selectTrack, tracks.length]);
 
-  const play = useCallback(async (enhance = false) => {
+  const play = useCallback(async (enhance = false, fromSync = false) => {
     const element = audio.current;
     if (!element || !activeTrack) return;
     if (hasAudibleVideo()) {
       pausedByVideoRef.current = true;
       setMessage('Music paused while a video has sound. Mute or pause the video to resume music.');
       return;
+    }
+    if (syncPairing && isMusicSyncConfigured()) {
+      const connection = syncConnection.current;
+      if (!connection) {
+        setMessage('Connecting to shared music controls. Try again when sync is connected.');
+        return;
+      }
+      if (!syncLeaderRef.current) {
+        try {
+          const lease = await connection.lease('acquire');
+          if (!lease.granted) {
+            syncOwnerRef.current = lease.ownerClientId;
+            setMessage('Music is already active in another client on this device. Use the controls here to control all paired players.');
+            return;
+          }
+          syncLeaderRef.current = true;
+          syncOwnerRef.current = syncClientId;
+        } catch (error) {
+          setMessage(error instanceof Error ? `Music sync could not acquire playback: ${error.message}` : 'Music sync could not acquire playback.');
+          return;
+        }
+      }
     }
     const enhancementStarted = enhance && volumePercent > 100 && enableAudioEnhancement();
     if (enhance && volumePercent > 100 && !enhancementStarted && enhancementSupported && !useNativePlayback) {
@@ -430,15 +489,124 @@ function ConfiguredMusicPlayer() {
       setIsPlaying(true);
       setNeedsResume(false);
       setMessage('');
+      if (!fromSync && syncConnection.current) {
+        void syncConnection.current.sendCommand({ type: 'play' }).catch((error: unknown) => {
+          setMessage(error instanceof Error ? `Music sync could not broadcast playback: ${error.message}` : 'Music sync could not broadcast playback.');
+        });
+      }
     } catch (error) {
       const autoplayBlocked = error instanceof Error && error.name === 'NotAllowedError';
       setNeedsResume(autoplayBlocked);
       setMessage(autoplayBlocked
         ? 'Autoplay was blocked. Click or tap anywhere to start music.'
         : 'This track could not be played. Check that the audio file or URL is available.');
+      if (syncLeaderRef.current && syncConnection.current) {
+        syncLeaderRef.current = false;
+        syncOwnerRef.current = null;
+        void syncConnection.current.lease('release').catch(() => {
+          setMessage('Playback failed and its sync lock could not be released yet.');
+        });
+      }
     }
-  }, [activeTrack, enableAudioEnhancement, enhancementSupported, useNativePlayback, volumePercent]);
+  }, [activeTrack, enableAudioEnhancement, enhancementSupported, syncClientId, syncPairing, useNativePlayback, volumePercent]);
   playTrackRef.current = () => { void play(true); };
+  playFromSyncRef.current = () => { void play(true, true); };
+
+  useEffect(() => {
+    if (!syncPairing) {
+      syncConnection.current = null;
+      syncLeaderRef.current = false;
+      syncOwnerRef.current = null;
+      setSyncConnectionStatus(isMusicSyncConfigured() ? 'disconnected' : 'unconfigured');
+      setSyncStateReady(false);
+      return;
+    }
+    if (!isMusicSyncConfigured()) {
+      setSyncConnectionStatus('unconfigured');
+      setSyncStateReady(false);
+      setMessage('Pairing is saved, but the shared music relay is not configured in this site build.');
+      return;
+    }
+
+    setSyncConnectionStatus('connecting');
+    setSyncStateReady(false);
+    const connection = connectMusicSync(syncPairing, syncClientId, {
+      onConnectionChange: (connected) => {
+        setSyncConnectionStatus(connected ? 'connected' : 'disconnected');
+      },
+      onState: (state) => {
+        setVolumePercent(state.volumePercent);
+        setIsMuted(state.muted);
+        setIsPlaying(state.playing);
+        setSyncStateReady(true);
+      },
+      onOwner: (ownerClientId) => {
+        syncOwnerRef.current = ownerClientId;
+        syncLeaderRef.current = ownerClientId === syncClientId;
+        if (ownerClientId && ownerClientId !== syncClientId && audio.current && !audio.current.paused) {
+          audio.current.pause();
+          setIsPlaying(false);
+          setMessage('Another paired client is playing music on this device.');
+        }
+      },
+      onCommand: (command) => {
+        if (command.type === 'play') {
+          if (!syncOwnerRef.current || syncOwnerRef.current === syncClientId) playFromSyncRef.current();
+        } else if (command.type === 'pause') {
+          if (syncLeaderRef.current && audio.current) audio.current.pause();
+          setIsPlaying(false);
+        } else if (command.type === 'mute') {
+          setIsMuted(true);
+          if (syncLeaderRef.current && audio.current) audio.current.muted = true;
+        } else if (command.type === 'unmute') {
+          setIsMuted(false);
+          if (syncLeaderRef.current && audio.current) audio.current.muted = false;
+        } else if (command.type === 'volume') {
+          setVolumePercent(command.value);
+        }
+      },
+      onError: setMessage,
+    });
+    if (!connection) {
+      setSyncConnectionStatus('unconfigured');
+      return;
+    }
+    syncConnection.current = connection;
+    return () => {
+      connection.close();
+      if (syncLeaderRef.current) {
+        syncLeaderRef.current = false;
+        syncOwnerRef.current = null;
+        void connection.lease('release').catch(() => {
+          setMessage('The music sync lease will expire automatically after this client closes.');
+        });
+      }
+      if (syncConnection.current === connection) syncConnection.current = null;
+    };
+  }, [syncClientId, syncPairing]);
+
+  useEffect(() => {
+    const connection = syncConnection.current;
+    if (!connection || syncConnectionStatus !== 'connected') return;
+    const heartbeat = window.setInterval(() => {
+      if (!syncLeaderRef.current) return;
+      void connection.lease('heartbeat').then((lease) => {
+        if (lease.granted) return;
+        syncLeaderRef.current = false;
+        syncOwnerRef.current = lease.ownerClientId;
+        audio.current?.pause();
+        setIsPlaying(false);
+        setMessage('This player lost its sync lock and has paused to prevent duplicate music.');
+      }).catch((error: unknown) => {
+        syncLeaderRef.current = false;
+        syncOwnerRef.current = null;
+        audio.current?.pause();
+        setIsPlaying(false);
+        setMessage(error instanceof Error ? `Music sync was lost; playback paused: ${error.message}` : 'Music sync was lost; playback paused.');
+      });
+    }, 3000);
+    return () => window.clearInterval(heartbeat);
+  }, [syncConnectionStatus, syncPairing]);
 
   useEffect(() => {
     const synchronizeAudio = () => {
@@ -473,12 +641,13 @@ function ConfiguredMusicPlayer() {
   }, []);
 
   useEffect(() => {
-    if (!isReady || !activeTrack || !shouldAutoplayOnLoad.current) return;
+    if (!isReady || !activeTrack || !shouldAutoplayOnLoad.current ||
+      (syncPairing && isMusicSyncConfigured() && (!syncStateReady || syncConnectionStatus !== 'connected'))) return;
     const restored = tracks.find((track) => track.id === restoredTrack.current);
     if (restored && restored.id !== activeTrack.id) return;
     shouldAutoplayOnLoad.current = false;
     void play();
-  }, [activeTrack, isReady, play, tracks]);
+  }, [activeTrack, isReady, play, syncConnectionStatus, syncPairing, syncStateReady, tracks]);
 
   useEffect(() => {
     const resumeAfterInteraction = (event: PointerEvent) => {
@@ -490,6 +659,72 @@ function ConfiguredMusicPlayer() {
     window.addEventListener('pointerdown', resumeAfterInteraction, { once: true });
     return () => window.removeEventListener('pointerdown', resumeAfterInteraction);
   }, [enableAudioEnhancement, enhancementSupported, needsResume, volumePercent]);
+
+  const saveSyncPairing = (code: string) => {
+    const pairing = parseMusicSyncCode(code);
+    if (!pairing) {
+      setMessage('Enter a valid pairing code copied from another client on this device.');
+      return;
+    }
+    try {
+      saveMusicSyncCode(pairing);
+      setSyncPairing(pairing);
+      setSyncCodeInput(getMusicSyncCode(pairing));
+      setAdditionalDeviceCode('');
+      setMessage('This client is paired. Repeat with the same code on other sites on this device.');
+    } catch (error) {
+      setMessage(error instanceof Error ? `The pairing code could not be saved: ${error.message}` : 'The pairing code could not be saved.');
+    }
+  };
+
+  const generateSyncPairing = () => {
+    const code = createMusicSyncCode();
+    setSyncCodeInput(code);
+    saveSyncPairing(code);
+  };
+
+  const sendSyncCommand = (command: { type: 'play' | 'pause' | 'mute' | 'unmute' | 'volume'; value?: number }) => {
+    const connection = syncConnection.current;
+    if (!connection) return;
+    void connection.sendCommand(command).catch((error: unknown) => {
+      setMessage(error instanceof Error ? `The shared music control failed: ${error.message}` : 'The shared music control failed.');
+    });
+  };
+
+  const copyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage('Pairing code copied.');
+    } catch (error) {
+      setMessage(error instanceof Error ? `Could not copy the pairing code: ${error.message}` : 'Could not copy the pairing code.');
+    }
+  };
+
+  const createDevicePairing = () => {
+    if (!syncPairing) return;
+    setAdditionalDeviceCode(createAdditionalDeviceCode(syncPairing));
+  };
+
+  const disconnectSync = () => {
+    const connection = syncConnection.current;
+    if (syncLeaderRef.current && connection) {
+      void connection.lease('release').catch((error: unknown) => {
+        setMessage(error instanceof Error ? `The sync lock could not be released: ${error.message}` : 'The sync lock could not be released.');
+      });
+    }
+    syncLeaderRef.current = false;
+    syncOwnerRef.current = null;
+    audio.current?.pause();
+    try {
+      saveMusicSyncCode(null);
+      setSyncPairing(null);
+      setSyncCodeInput('');
+      setAdditionalDeviceCode('');
+      setIsPlaying(false);
+    } catch (error) {
+      setMessage(error instanceof Error ? `Could not remove pairing: ${error.message}` : 'Could not remove pairing.');
+    }
+  };
 
   const savePrivateUrls = (next: PrivateUrlTrack[]) => {
     try {
@@ -581,6 +816,10 @@ function ConfiguredMusicPlayer() {
   };
 
   const togglePlayback = () => {
+    if (syncConnection.current) {
+      sendSyncCommand({ type: isPlaying ? 'pause' : 'play' });
+      return;
+    }
     if (!audio.current) return;
     if (isPlaying) {
       if (activeTrack) {
@@ -598,6 +837,16 @@ function ConfiguredMusicPlayer() {
 
   const stopPlayback = () => {
     const element = audio.current;
+    if (syncConnection.current) {
+      sendSyncCommand({ type: 'pause' });
+      if (syncLeaderRef.current) {
+        syncLeaderRef.current = false;
+        syncOwnerRef.current = null;
+        void syncConnection.current.lease('release').catch((error: unknown) => {
+          setMessage(error instanceof Error ? `The sync lock could not be released: ${error.message}` : 'The sync lock could not be released.');
+        });
+      }
+    }
     if (!element) return;
     pausedByVideoRef.current = false;
     playAfterLoad.current = false;
@@ -613,6 +862,13 @@ function ConfiguredMusicPlayer() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Playback could not be stopped.');
     }
+  };
+
+  const toggleMute = () => {
+    const muted = !isMuted;
+    setIsMuted(muted);
+    if (audio.current) audio.current.muted = muted;
+    if (syncConnection.current) sendSyncCommand({ type: muted ? 'mute' : 'unmute' });
   };
 
   const onTimeUpdate = () => {
@@ -660,6 +916,38 @@ function ConfiguredMusicPlayer() {
             <button type="button" className="icon-button" aria-label="Close music library" onClick={() => setIsOpen(false)}><X size={18} /></button>
           </div>
           <p className="privacy-note">Your device tracks and saved links stay in this browser. Nothing is uploaded or synced to an account.</p>
+          <div className="music-sync-settings">
+            <h3>Sync music across clients</h3>
+            <p>{!isMusicSyncConfigured()
+              ? 'The shared relay must be deployed and configured before sync can connect.'
+              : syncPairing
+                ? `Private pairing · ${syncConnectionStatus}`
+                : 'Pair the sites on this device using the same private code.'}</p>
+            {syncPairing ? (
+              <>
+                <input className="sync-code-input" aria-label="This device pairing code" readOnly value={getMusicSyncCode(syncPairing)} />
+                <div className="sync-actions">
+                  <button type="button" className="secondary-button" onClick={() => void copyText(getMusicSyncCode(syncPairing))}>Copy this device code</button>
+                  <button type="button" className="secondary-button" onClick={createDevicePairing}>Create another device code</button>
+                  <button type="button" className="secondary-button" onClick={disconnectSync}>Disconnect sync</button>
+                </div>
+                {additionalDeviceCode && (
+                  <div className="sync-device-code">
+                    <input className="sync-code-input" aria-label="New device pairing code" readOnly value={additionalDeviceCode} />
+                    <button type="button" className="secondary-button" onClick={() => void copyText(additionalDeviceCode)}>Copy new device code</button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <input className="sync-code-input" aria-label="Private music pairing code" value={syncCodeInput} onChange={(event) => setSyncCodeInput(event.currentTarget.value)} placeholder="Paste pairing code" />
+                <div className="sync-actions">
+                  <button type="button" className="secondary-button" onClick={generateSyncPairing}>Create a private code</button>
+                  <button type="button" className="secondary-button" onClick={() => saveSyncPairing(syncCodeInput)}>Connect this site</button>
+                </div>
+              </>
+            )}
+          </div>
           <div className="track-list">
             {tracks.length ? tracks.map((track, index) => (
               <div className={`track-row ${track.id === activeTrack?.id ? 'selected' : ''}`} key={track.id}>
@@ -698,8 +986,10 @@ function ConfiguredMusicPlayer() {
         <button type="button" className="player-icon" aria-label="Next track" title="Next track" disabled={tracks.length < 2} onClick={() => selectNextTrack(Boolean(audio.current && !audio.current.paused))}><SkipForward size={16} /></button>
         <button type="button" className="player-icon shuffle-toggle" aria-label="Shuffle tracks" title="Shuffle tracks" aria-pressed={isShuffleEnabled} disabled={tracks.length < 2} onClick={() => setIsShuffleEnabled((enabled) => !enabled)}><Shuffle size={16} /></button>
       </div>
-      <label className="volume-control">
-        <Volume2 size={16} aria-hidden="true" />
+      <div className="volume-control">
+        <button type="button" className="player-icon" aria-label={isMuted ? 'Unmute all paired players' : 'Mute all paired players'} title={isMuted ? 'Unmute all paired players' : 'Mute all paired players'} onClick={toggleMute}>
+          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        </button>
         <input
           type="range"
           min="0"
@@ -714,10 +1004,11 @@ function ConfiguredMusicPlayer() {
             if (audio.current) audio.current.volume = Math.min(nextPercent, 100) / 100;
             if (nextPercent > 100 && audioProcessingEnabled) enableAudioEnhancement(1 + boost * 9, boost * 18);
             else if (audioPower.current) enableAudioEnhancement(1, 0);
+            if (syncConnection.current) sendSyncCommand({ type: 'volume', value: nextPercent });
           }}
         />
         <output>{Math.min(volumePercent, audioProcessingEnabled ? 200 : 100)}%</output>
-      </label>
+      </div>
       <div className="player-progress" aria-label="Track progress">
         <span style={{ width: `${progress * 100}%` }} />
       </div>
