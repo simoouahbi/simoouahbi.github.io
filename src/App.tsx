@@ -172,7 +172,7 @@ function HomePage() {
         <div className="hero-content">
           <p className="eyebrow">SIMOOUAHBI · PORTFOLIO</p>
           <div className="hero-heading-row">
-            <h1>Simoouahbi</h1>
+            <h1>Hi, I’m <span>Simoouahbi.</span><br />I turn <span className="gradient-text">ideas into experiences.</span></h1>
             <button
               className="hero-avatar-button"
               type="button"
