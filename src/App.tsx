@@ -29,6 +29,7 @@ import TimelineVideo from './components/TimelineVideo';
 import TimelinePage from './TimelinePage';
 import ProtectedUsersPage from './protectedUSERS_root_path_secure/ProtectedUsersPage';
 import { PUBLIC_PLAYLIST } from './music/playlist';
+import simoAvatar from '../assets/SIMOAVATAR.jpeg';
 
 const ThreeBackground = lazy(() => import('./components/ThreeBackground'));
 
@@ -152,6 +153,19 @@ function EcoRightSidebar({
 }
 
 function HomePage() {
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAvatarOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAvatarOpen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAvatarOpen]);
+
   return (
     <main id="main" className="page-main" tabIndex={-1}>
       <section className="hero-section">
@@ -159,12 +173,46 @@ function HomePage() {
           <p className="eyebrow">SIMOOUAHBI · PORTFOLIO</p>
           <div className="hero-heading-row">
             <h1>Simoouahbi</h1>
+            <button
+              className="hero-avatar-button"
+              type="button"
+              onClick={() => setIsAvatarOpen(true)}
+              aria-label="Enlarge photo of Simoouahbi"
+            >
+              <img className="hero-avatar" src={simoAvatar} alt="Simoouahbi" />
+            </button>
           </div>
+          <p className="hero-subtitle">A personal space for projects, stories, and future creative work.</p>
           <div className="hero-actions">
+            <a className="primary-button" href="/timeline.html">Explore the timeline <ArrowUpRight size={16} /></a>
             <GitHubFollowButton />
+            <a className="secondary-button" href="/about.html">About Simoouahbi <ArrowUpRight size={15} /></a>
           </div>
+          <p className="hero-caption">Personal portfolio · creative projects · stories in progress</p>
         </div>
       </section>
+      {isAvatarOpen && (
+        <div
+          className="avatar-lightbox"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsAvatarOpen(false);
+          }}
+        >
+          <div className="avatar-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Simoouahbi photo">
+            <button
+              className="avatar-lightbox-close"
+              type="button"
+              onClick={() => setIsAvatarOpen(false)}
+              aria-label="Close enlarged photo"
+              autoFocus
+            >
+              <X size={24} />
+            </button>
+            <img src={simoAvatar} alt="Simoouahbi" />
+          </div>
+        </div>
+      )}
       <section className="content-section intro-section" id="ecosystem">
         <div className="section-heading"><span className="eyebrow">ABOUT</span><h2>Simoouahbi</h2></div>
       </section>

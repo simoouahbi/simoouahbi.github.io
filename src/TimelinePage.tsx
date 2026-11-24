@@ -1,6 +1,7 @@
 import { portfolioVideos } from './lib/portfolioVideos';
 import PortfolioVideoCard from './components/PortfolioVideoCard';
 import { PortfolioVideoMuteProvider } from './components/PortfolioVideoMuteContext';
+import MediaPlaceholderGallery from './components/MediaPlaceholderGallery';
 
 export default function TimelinePage() {
   return (
@@ -14,16 +15,16 @@ export default function TimelinePage() {
 
         <section className="content-section portfolio-video-timeline" aria-labelledby="portfolio-video-heading">
           <div className="section-heading">
-            <span className="eyebrow">VIDEO STORIES</span>
-            <h2 id="portfolio-video-heading">Moments in motion.</h2>
-            <p>{portfolioVideos.length} videos</p>
+            <span className="eyebrow">{portfolioVideos.length ? 'VIDEO STORIES' : 'MEDIA PLACEHOLDERS'}</span>
+            <h2 id="portfolio-video-heading">{portfolioVideos.length ? 'Moments in motion.' : 'Make room for future media.'}</h2>
+            <p>{portfolioVideos.length ? `${portfolioVideos.length} videos` : 'Photo, video, and media spaces are ready for future content.'}</p>
           </div>
           {portfolioVideos.length ? (
             <ol className="portfolio-video-grid">
               {portfolioVideos.map((video) => <PortfolioVideoCard video={video} key={video.id} />)}
             </ol>
           ) : (
-            <p className="language-note">No videos have been added yet.</p>
+            <MediaPlaceholderGallery />
           )}
         </section>
       </main>

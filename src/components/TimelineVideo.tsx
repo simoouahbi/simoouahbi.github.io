@@ -1,24 +1,26 @@
 import { portfolioVideos } from '../lib/portfolioVideos';
 import PortfolioVideoCard from './PortfolioVideoCard';
 import { PortfolioVideoMuteProvider } from './PortfolioVideoMuteContext';
+import MediaPlaceholderGallery from './MediaPlaceholderGallery';
 
 const featuredVideos = portfolioVideos.slice(0, 3);
+const hasFeaturedVideos = featuredVideos.length > 0;
 
 export default function TimelineVideo() {
   return (
     <PortfolioVideoMuteProvider>
       <section className="content-section timeline-video-section" aria-labelledby="timeline-video-heading">
         <div className="section-heading">
-          <span className="eyebrow">FEATURED VIDEO STORIES</span>
-          <h2 id="timeline-video-heading">Moments in motion.</h2>
-          <p>Video stories</p>
+          <span className="eyebrow">{hasFeaturedVideos ? 'FEATURED VIDEO STORIES' : 'MEDIA PLACEHOLDERS'}</span>
+          <h2 id="timeline-video-heading">{hasFeaturedVideos ? 'Moments in motion.' : 'Make room for future media.'}</h2>
+          <p>{hasFeaturedVideos ? 'Video stories' : 'Photo, video, and media spaces are ready for future content.'}</p>
         </div>
-        {featuredVideos.length ? (
+        {hasFeaturedVideos ? (
           <ol className="portfolio-video-grid homepage-video-grid">
             {featuredVideos.map((video) => <PortfolioVideoCard video={video} key={video.id} />)}
           </ol>
         ) : (
-          <p className="language-note">No videos have been added yet.</p>
+          <MediaPlaceholderGallery />
         )}
         <a className="secondary-button timeline-all-videos" href="/timeline.html">
           Open the timeline
