@@ -18,7 +18,6 @@ import {
 
 const PLAYER_KEY = 'eco-starter:player';
 const PRIVATE_URLS_KEY = 'eco-starter:private-urls';
-const SMALL_SCREEN_QUERY = '(max-width: 640px)';
 
 interface PlayerTrack {
   id: string;
@@ -183,6 +182,7 @@ function ConfiguredMusicPlayer() {
   const restoredTrack = useRef('');
   const shouldAutoplayOnLoad = useRef(true);
   const playAfterLoad = useRef(false);
+  const nativeFallbackPending = useRef(false);
   const playTrackRef = useRef<() => void>(() => {});
   const pausedByVideoRef = useRef(false);
   const activeTrackRef = useRef<PlayerTrack | undefined>(undefined);
@@ -207,9 +207,7 @@ function ConfiguredMusicPlayer() {
   const syncLeaderRef = useRef(false);
   const syncOwnerRef = useRef<string | null>(null);
   const playFromSyncRef = useRef<() => void>(() => {});
-  const [useNativePlayback, setUseNativePlayback] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(SMALL_SCREEN_QUERY).matches,
-  );
+  const [useNativePlayback, setUseNativePlayback] = useState(false);
   const [isShuffleEnabled, setIsShuffleEnabled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -231,26 +229,29 @@ function ConfiguredMusicPlayer() {
   const volumeBass = volumeBoost * 18;
   activeTrackRef.current = activeTrack;
 
-  const switchToNativePlayback = useCallback((showNotice = true) => {
+  const switchToNativePlayback = useCallback(() => {
+    const element = audio.current;
+    if (element && activeTrack) {
+      restoredTrack.current = activeTrack.id;
+      restoredTime.current = Number.isFinite(element.currentTime) ? element.currentTime : 0;
+      playAfterLoad.current = playAfterLoad.current || !element.paused;
+    }
+    nativeFallbackPending.current = true;
+    setUseNativePlayback(true);
+    if (element) element.volume = Math.min(volumePercent, 100) / 100;
+    setMessage('Volume boost is unavailable for this track; standard volume is available.');
+  }, [activeTrack, volumePercent]);
+
+  const switchToEnhancedPlayback = useCallback(() => {
     const element = audio.current;
     if (element && activeTrack) {
       restoredTrack.current = activeTrack.id;
       restoredTime.current = Number.isFinite(element.currentTime) ? element.currentTime : 0;
       playAfterLoad.current = !element.paused;
     }
-    setUseNativePlayback(true);
-    if (element) element.volume = Math.min(volumePercent, 100) / 100;
-    if (showNotice) setMessage('Volume boost is unavailable for this track; standard volume is available.');
-  }, [activeTrack, volumePercent]);
-
-  useEffect(() => {
-    const smallScreen = window.matchMedia(SMALL_SCREEN_QUERY);
-    const useNativeOnSmallScreen = (event: MediaQueryListEvent) => {
-      if (event.matches) switchToNativePlayback(false);
-    };
-    smallScreen.addEventListener('change', useNativeOnSmallScreen);
-    return () => smallScreen.removeEventListener('change', useNativeOnSmallScreen);
-  }, [switchToNativePlayback]);
+    setUseNativePlayback(false);
+    setMessage('');
+  }, [activeTrack]);
 
   const enableAudioEnhancement = useCallback((gainLevel = volumeGain, bassLevel = volumeBass) => {
     const element = audio.current;
@@ -264,13 +265,21 @@ function ConfiguredMusicPlayer() {
       if (!graph) {
         graph = createAudioPowerGraph(element, gainLevel, bassLevel);
         audioPower.current = graph;
+        const context = graph.context;
+        context.addEventListener('statechange', () => {
+          if (context.state !== 'running' && context.state !== 'closed' && !element.paused && document.visibilityState === 'visible') {
+            void context.resume().then(() => {
+              if (context.state !== 'running') switchToNativePlayback();
+            }).catch(switchToNativePlayback);
+          }
+        });
       }
       updateAudioPowerGraph(graph, gainLevel, bassLevel);
       const context = graph.context;
       if (context.state !== 'running') {
         void context.resume().then(() => {
           if (context.state !== 'running') switchToNativePlayback();
-        }).catch(() => switchToNativePlayback());
+        }).catch(switchToNativePlayback);
       }
       setMessage('');
       return true;
@@ -287,10 +296,10 @@ function ConfiguredMusicPlayer() {
   }, [activeTrack, switchToNativePlayback, useNativePlayback, volumeBass, volumeGain]);
 
   useEffect(() => {
-    if (audioProcessingEnabled || volumePercent <= 100) return;
+    if (enhancementSupported || volumePercent <= 100) return;
     setVolumePercent(100);
     if (audio.current) audio.current.volume = 1;
-  }, [audioProcessingEnabled, volumePercent]);
+  }, [enhancementSupported, volumePercent]);
 
   useEffect(() => {
     if (audioProcessingEnabled) return;
@@ -368,8 +377,11 @@ function ConfiguredMusicPlayer() {
     setProgress(0);
     if (playAfterLoad.current && activeTrack) {
       playAfterLoad.current = false;
+      nativeFallbackPending.current = false;
       window.setTimeout(() => playTrackRef.current(), 0);
-    };
+    } else {
+      nativeFallbackPending.current = false;
+    }
   }, [activeTrack?.id, activeTrack?.src, audioProcessingEnabled]);
 
   useEffect(() => () => {
@@ -456,6 +468,9 @@ function ConfiguredMusicPlayer() {
           return;
         }
       }
+    }
+    if (enhance && volumePercent > 100 && enhancementSupported && !useNativePlayback) {
+      playAfterLoad.current = true;
     }
     const enhancementStarted = enhance && volumePercent > 100 && enableAudioEnhancement();
     if (enhance && volumePercent > 100 && !enhancementStarted && enhancementSupported && !useNativePlayback) {
@@ -904,10 +919,16 @@ function ConfiguredMusicPlayer() {
         ref={audio}
         loop={tracks.length === 1}
         preload="none"
+        onVolumeChange={() => {
+          if (volumePercent > 100 && audioProcessingEnabled) {
+            enableAudioEnhancement(volumeGain, volumeBass);
+          }
+        }}
         onTimeUpdate={onTimeUpdate}
         onPlay={() => {
           setIsPlaying(true);
           setNeedsResume(false);
+          if (!nativeFallbackPending.current) playAfterLoad.current = false;
         }}
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
@@ -1005,21 +1026,22 @@ function ConfiguredMusicPlayer() {
         <input
           type="range"
           min="0"
-          max={audioProcessingEnabled ? 200 : 100}
+          max={enhancementSupported ? 200 : 100}
           step="10"
-          value={Math.min(volumePercent, audioProcessingEnabled ? 200 : 100)}
+          value={Math.min(volumePercent, enhancementSupported ? 200 : 100)}
           aria-label="Volume"
           onChange={(event) => {
             const nextPercent = Number(event.currentTarget.value);
             const boost = Math.max(0, Math.min(1, (nextPercent - 100) / 100));
             setVolumePercent(nextPercent);
             if (audio.current) audio.current.volume = Math.min(nextPercent, 100) / 100;
-            if (nextPercent > 100 && audioProcessingEnabled) enableAudioEnhancement(1 + boost * 9, boost * 18);
+            if (nextPercent > 100 && enhancementSupported && useNativePlayback) switchToEnhancedPlayback();
+            else if (nextPercent > 100 && audioProcessingEnabled) enableAudioEnhancement(1 + boost * 9, boost * 18);
             else if (audioPower.current) enableAudioEnhancement(1, 0);
             if (syncConnection.current) sendSyncCommand({ type: 'volume', value: nextPercent });
           }}
         />
-        <output>{Math.min(volumePercent, audioProcessingEnabled ? 200 : 100)}%</output>
+        <output>{Math.min(volumePercent, enhancementSupported ? 200 : 100)}%</output>
       </div>
       <div className="player-progress" aria-label="Track progress">
         <span style={{ width: `${progress * 100}%` }} />
