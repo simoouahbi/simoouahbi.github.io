@@ -1,6 +1,6 @@
 {
   "method": "first-party source file bytes",
-  "totalSourceBytes": 277545,
+  "totalSourceBytes": 277955,
   "languages": [
     {
       "name": "Rust",
@@ -34,7 +34,7 @@
       "extension": ".ts, .tsx",
       "starterDirectory": "starters/typescript",
       "fileCount": 27,
-      "sourceBytes": 149748,
+      "sourceBytes": 150158,
       "actualPercent": 54,
       "equalPercent": 12.5
     },
