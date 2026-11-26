@@ -200,6 +200,7 @@ function ConfiguredMusicPlayer() {
   const [volumePercent, setVolumePercent] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
   const [syncPairing, setSyncPairing] = useState<MusicSyncPairing | null>(readMusicSyncCode);
+  const [pendingPairing, setPendingPairing] = useState<MusicSyncPairing | null>(null);
   const [syncCodeInput, setSyncCodeInput] = useState('');
   const [additionalDeviceCode, setAdditionalDeviceCode] = useState('');
   const [syncConnectionStatus, setSyncConnectionStatus] = useState<'unconfigured' | 'connecting' | 'connected' | 'disconnected'>('unconfigured');
@@ -730,12 +731,18 @@ function ConfiguredMusicPlayer() {
       setMessage('Enter a valid pairing code copied from another client on this device.');
       return;
     }
-    if (!window.confirm('Pairing shares your saved audio links and uploads this browser’s imported audio files to the shared music room. Anyone with the code can listen to or remove shared tracks. Continue?')) return;
+    setPendingPairing(pairing);
+  };
+
+  const confirmSyncPairing = () => {
+    const pairing = pendingPairing;
+    if (!pairing) return;
     try {
       saveMusicSyncCode(pairing);
       setSyncPairing(pairing);
       setSyncCodeInput(getMusicSyncCode(pairing));
       setAdditionalDeviceCode('');
+      setPendingPairing(null);
       setMessage('This client is paired. Repeat with the same code on other sites on this device.');
     } catch (error) {
       setMessage(error instanceof Error ? `The pairing code could not be saved: ${error.message}` : 'The pairing code could not be saved.');
@@ -999,7 +1006,17 @@ function ConfiguredMusicPlayer() {
               : syncPairing
                 ? `Private pairing · ${syncConnectionStatus}`
                 : 'Pair the sites on this device using the same private code.'}</p>
-            {syncPairing ? (
+            {pendingPairing ? (
+              <div className="add-music" role="group" aria-labelledby="sync-confirm-title">
+                <h4 id="sync-confirm-title">Confirm pairing</h4>
+                <p className="privacy-note">This shares saved audio links and uploads this browser’s imported audio to the room. Anyone with this code can listen to or remove shared tracks.</p>
+                <input className="sync-code-input" aria-label="Pairing code awaiting confirmation" readOnly value={getMusicSyncCode(pendingPairing)} />
+                <div className="sync-actions">
+                  <button type="button" className="secondary-button" onClick={() => setPendingPairing(null)}>Cancel</button>
+                  <button type="button" className="secondary-button" onClick={confirmSyncPairing}>Confirm &amp; connect</button>
+                </div>
+              </div>
+            ) : syncPairing ? (
               <>
                 <input className="sync-code-input" aria-label="This device pairing code" readOnly value={getMusicSyncCode(syncPairing)} />
                 <div className="sync-actions">
