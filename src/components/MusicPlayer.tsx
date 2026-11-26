@@ -204,6 +204,7 @@ function ConfiguredMusicPlayer() {
   const [syncCodeInput, setSyncCodeInput] = useState('');
   const [additionalDeviceCode, setAdditionalDeviceCode] = useState('');
   const [syncConnectionStatus, setSyncConnectionStatus] = useState<'unconfigured' | 'connecting' | 'connected' | 'disconnected'>('unconfigured');
+  const [syncUploadStatus, setSyncUploadStatus] = useState<'idle' | 'uploading' | 'ready' | 'error'>('idle');
   const [syncStateReady, setSyncStateReady] = useState(false);
   const [syncClientId] = useState(createMusicSyncClientId);
   const syncConnection = useRef<MusicSyncConnection | null>(null);
@@ -632,7 +633,10 @@ function ConfiguredMusicPlayer() {
 
   useEffect(() => {
     const connection = syncConnection.current;
-    if (!connection || syncConnectionStatus !== 'connected') return;
+    if (!connection || syncConnectionStatus !== 'connected') {
+      setSyncUploadStatus('idle');
+      return;
+    }
     const localTracks = [
       ...privateUrls.map((track) => ({
         id: track.id,
@@ -647,9 +651,19 @@ function ConfiguredMusicPlayer() {
         file: track.file,
       })),
     ];
-    void connection.syncLibrary(localTracks).then(setSharedTracks).catch((error: unknown) => {
+    const hasImportedFiles = deviceTracks.length > 0;
+    setSyncUploadStatus(hasImportedFiles ? 'uploading' : 'idle');
+    let active = true;
+    void connection.syncLibrary(localTracks).then((syncedTracks) => {
+      if (!active) return;
+      setSharedTracks(syncedTracks);
+      setSyncUploadStatus(hasImportedFiles ? 'ready' : 'idle');
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setSyncUploadStatus(hasImportedFiles ? 'error' : 'idle');
       setMessage(error instanceof Error ? `The library could not be shared: ${error.message}` : 'The library could not be shared.');
     });
+    return () => { active = false; };
   }, [deviceTracks, privateUrls, syncConnectionStatus, syncPairing]);
 
   useEffect(() => {
@@ -1003,6 +1017,8 @@ function ConfiguredMusicPlayer() {
           <p className="privacy-note">Without pairing, tracks stay in this browser. Pairing shares your saved links and uploads local audio files to the shared music room.</p>
           <div className="music-sync-settings">
             <h3>Sync music across clients</h3>
+            {syncUploadStatus === 'uploading' && <p className="privacy-note" role="status">Uploading imported audio to the shared room. Keep this site open.</p>}
+            {syncUploadStatus === 'ready' && <p className="privacy-note" role="status">Imported audio is uploaded and ready to play on other connected sites.</p>}
             <p>{!isMusicSyncConfigured()
               ? 'The shared relay must be deployed and configured before sync can connect.'
               : syncPairing
