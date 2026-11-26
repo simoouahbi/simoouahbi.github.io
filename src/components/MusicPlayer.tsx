@@ -13,6 +13,7 @@ import {
   readMusicSyncCode,
   saveMusicSyncCode,
   type MusicSyncConnection,
+  type MusicSyncLibraryTrack,
   type MusicSyncPairing,
 } from '../music/musicSync';
 
@@ -24,7 +25,7 @@ interface PlayerTrack {
   title: string;
   artist: string;
   src: string;
-  kind: 'public' | 'device' | 'private-url';
+  kind: 'public' | 'device' | 'private-url' | 'shared';
 }
 
 interface SavedPlayer {
@@ -191,6 +192,7 @@ function ConfiguredMusicPlayer() {
   const lastSavedSecond = useRef(-1);
   const [deviceTracks, setDeviceTracks] = useState<(StoredDeviceTrack & { src: string })[]>([]);
   const [privateUrls, setPrivateUrls] = useState<PrivateUrlTrack[]>([]);
+  const [sharedTracks, setSharedTracks] = useState<MusicSyncLibraryTrack[]>([]);
   const [activeId, setActiveId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -219,7 +221,10 @@ function ConfiguredMusicPlayer() {
     ...PUBLIC_PLAYLIST.map((track) => ({ ...track, src: track.audioUrl, kind: 'public' as const })),
     ...privateUrls.map((track) => ({ id: track.id, title: track.title, artist: track.artist, src: track.audioUrl, kind: 'private-url' as const })),
     ...deviceTracks.map((track) => ({ id: track.id, title: track.title, artist: track.artist, src: track.src, kind: 'device' as const })),
-  ], [deviceTracks, privateUrls]);
+    ...sharedTracks
+      .filter((track) => !deviceTracks.some((local) => local.id === track.id) && !privateUrls.some((local) => local.id === track.id))
+      .map((track) => ({ id: track.id, title: track.title, artist: track.artist, src: track.audioUrl, kind: 'shared' as const })),
+  ], [deviceTracks, privateUrls, sharedTracks]);
   const activeTrack = tracks.find((track) => track.id === activeId) ?? tracks[0];
   const activeIndex = Math.max(0, tracks.findIndex((track) => track.id === activeTrack?.id));
   const enhancementSupported = canEnhanceTrack(activeTrack);
@@ -560,12 +565,22 @@ function ConfiguredMusicPlayer() {
     const connection = connectMusicSync(syncPairing, syncClientId, {
       onConnectionChange: (connected) => {
         setSyncConnectionStatus(connected ? 'connected' : 'disconnected');
+        if (connected) {
+          void syncConnection.current?.readLibrary().then(setSharedTracks).catch((error: unknown) => {
+            setMessage(error instanceof Error ? `The shared library could not be loaded: ${error.message}` : 'The shared library could not be loaded.');
+          });
+        }
       },
       onState: (state) => {
         setVolumePercent(state.volumePercent);
         setIsMuted(state.muted);
         setIsPlaying(state.playing);
         setSyncStateReady(true);
+      },
+      onLibraryChange: () => {
+        void syncConnection.current?.readLibrary().then(setSharedTracks).catch((error: unknown) => {
+          setMessage(error instanceof Error ? `The shared library could not be refreshed: ${error.message}` : 'The shared library could not be refreshed.');
+        });
       },
       onOwner: (ownerClientId) => {
         syncOwnerRef.current = ownerClientId;
@@ -611,6 +626,28 @@ function ConfiguredMusicPlayer() {
       if (syncConnection.current === connection) syncConnection.current = null;
     };
   }, [syncClientId, syncPairing]);
+
+  useEffect(() => {
+    const connection = syncConnection.current;
+    if (!connection || syncConnectionStatus !== 'connected') return;
+    const localTracks = [
+      ...privateUrls.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        audioUrl: track.audioUrl,
+      })),
+      ...deviceTracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        file: track.file,
+      })),
+    ];
+    void connection.syncLibrary(localTracks).then(setSharedTracks).catch((error: unknown) => {
+      setMessage(error instanceof Error ? `The library could not be shared: ${error.message}` : 'The library could not be shared.');
+    });
+  }, [deviceTracks, privateUrls, syncConnectionStatus, syncPairing]);
 
   useEffect(() => {
     const connection = syncConnection.current;
@@ -693,6 +730,7 @@ function ConfiguredMusicPlayer() {
       setMessage('Enter a valid pairing code copied from another client on this device.');
       return;
     }
+    if (!window.confirm('Pairing shares your saved audio links and uploads this browser’s imported audio files to the shared music room. Anyone with the code can listen to or remove shared tracks. Continue?')) return;
     try {
       saveMusicSyncCode(pairing);
       setSyncPairing(pairing);
@@ -745,6 +783,7 @@ function ConfiguredMusicPlayer() {
     try {
       saveMusicSyncCode(null);
       setSyncPairing(null);
+      setSharedTracks([]);
       setSyncCodeInput('');
       setAdditionalDeviceCode('');
       setIsPlaying(false);
@@ -832,6 +871,10 @@ function ConfiguredMusicPlayer() {
         setDeviceTracks((current) => current.filter((item) => item.id !== track.id));
       } else if (track.kind === 'private-url') {
         savePrivateUrls(privateUrls.filter((item) => item.id !== track.id));
+      }
+      if (syncConnection.current && track.kind !== 'public') {
+        await syncConnection.current.deleteTrack(track.id);
+        setSharedTracks((current) => current.filter((item) => item.id !== track.id));
       }
       if (track.id === activeId) {
         const nextTracks = tracks.filter((item) => item.id !== track.id);
@@ -948,7 +991,7 @@ function ConfiguredMusicPlayer() {
             </div>
             <button type="button" className="icon-button" aria-label="Close music library" onClick={() => setIsOpen(false)}><X size={18} /></button>
           </div>
-          <p className="privacy-note">Your device tracks and saved links stay in this browser. Nothing is uploaded or synced to an account.</p>
+          <p className="privacy-note">Without pairing, tracks stay in this browser. Pairing shares your saved links and uploads local audio files to the shared music room.</p>
           <div className="music-sync-settings">
             <h3>Sync music across clients</h3>
             <p>{!isMusicSyncConfigured()
@@ -986,7 +1029,7 @@ function ConfiguredMusicPlayer() {
               <div className={`track-row ${track.id === activeTrack?.id ? 'selected' : ''}`} key={track.id}>
                 <button type="button" className="track-select" onClick={() => selectTrack(index, Boolean(audio.current && !audio.current.paused))} aria-current={track.id === activeTrack?.id ? 'true' : undefined}>
                   <span className="track-art"><Music2 size={16} /></span>
-                  <span className="track-label"><strong>{track.title}</strong><small>{track.artist} · {track.kind === 'public' ? 'Public playlist' : 'Private to this device'}</small></span>
+                  <span className="track-label"><strong>{track.title}</strong><small>{track.artist} · {track.kind === 'public' ? 'Public playlist' : track.kind === 'shared' ? 'Shared music room' : syncPairing ? 'Shared music room' : 'Private to this device'}</small></span>
                 </button>
                 {track.kind !== 'public' && <button type="button" className="icon-button remove-track" aria-label={`Remove ${track.title}`} onClick={() => void deleteTrack(track)}><Trash2 size={15} /></button>}
               </div>
@@ -995,7 +1038,7 @@ function ConfiguredMusicPlayer() {
           <div className="add-music">
             <button type="button" className="secondary-button" onClick={() => void openAudioPicker()}><Upload size={15} /> Add audio files</button>
             <input ref={fileInput} className="visually-hidden" type="file" accept="audio/*" multiple onChange={(event) => void addFiles(event.currentTarget.files)} />
-            <p className="storage-note">Imported files use this browser's File System (OPFS) when available, with IndexedDB as a fallback.</p>
+            <p className="storage-note">Imported files use this browser's File System (OPFS) or IndexedDB. Pairing uploads these audio files to the shared room; the relay stores audio in MongoDB GridFS.</p>
             <form className="url-form" onSubmit={addUrl}>
               <label htmlFor="track-title">Save an audio URL to this device</label>
               <input id="track-title" value={urlTitle} onChange={(event) => setUrlTitle(event.target.value)} placeholder="Track title (optional)" />

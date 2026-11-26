@@ -9,6 +9,22 @@ export interface MusicSyncState {
   playing: boolean;
 }
 
+export interface MusicSyncLibraryTrack {
+  id: string;
+  title: string;
+  artist: string;
+  kind: 'file' | 'url';
+  audioUrl: string;
+}
+
+export interface MusicSyncLocalTrack {
+  id: string;
+  title: string;
+  artist: string;
+  audioUrl?: string;
+  file?: Blob;
+}
+
 export type MusicSyncCommand =
   | { type: 'play' | 'pause' | 'mute' | 'unmute'; senderId: string }
   | { type: 'volume'; value: number; senderId: string };
@@ -18,6 +34,9 @@ export interface MusicSyncConnection {
   close: () => void;
   lease: (action: 'acquire' | 'heartbeat' | 'release') => Promise<{ granted: boolean; ownerClientId: string | null }>;
   sendCommand: (command: { type: MusicSyncCommand['type']; value?: number }) => Promise<void>;
+  readLibrary: () => Promise<MusicSyncLibraryTrack[]>;
+  syncLibrary: (tracks: MusicSyncLocalTrack[]) => Promise<MusicSyncLibraryTrack[]>;
+  deleteTrack: (trackId: string) => Promise<void>;
 }
 
 export const MUSIC_SYNC_STORAGE_KEY = 'eco:music-sync-pairing';
@@ -91,6 +110,7 @@ export function connectMusicSync(
     onCommand: (command: MusicSyncCommand) => void;
     onOwner: (clientId: string | null) => void;
     onState: (state: MusicSyncState) => void;
+    onLibraryChange: () => void;
     onConnectionChange: (connected: boolean) => void;
     onError: (message: string) => void;
   },
@@ -149,35 +169,107 @@ export function connectMusicSync(
       handlers.onError('The music sync service sent an invalid command.');
     }
   });
+  events.addEventListener('library', handlers.onLibraryChange);
 
-  const post = async (path: string, body: Record<string, unknown>) => {
-    const response = await fetch(`${relayUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, ...pairing, clientId }),
+  const request = async (path: string, method: string, body?: BodyInit, contentType?: string) => {
+    const target = /^https?:\/\//i.test(path) ? path : `${relayUrl}${path}`;
+    const response = await fetch(target, {
+      method,
+      headers: contentType ? { 'Content-Type': contentType } : undefined,
+      body,
     });
-    const result: unknown = await response.json();
     if (!response.ok) {
-      const message = typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string'
-        ? result.error
-        : 'The music sync request failed.';
+      let message = 'The music sync request failed.';
+      try {
+        const result: unknown = await response.json();
+        if (typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string') {
+          message = result.error;
+        }
+      } catch {
+        message = `The music sync request failed with status ${response.status}.`;
+      }
       throw new Error(message);
     }
-    return result;
+    return response.status === 204 ? null : response.json() as Promise<unknown>;
+  };
+
+  const pairedPath = (path: string) => {
+    const url = new URL(`${relayUrl}${path}`);
+    url.searchParams.set('roomId', pairing.roomId);
+    url.searchParams.set('deviceId', pairing.deviceId);
+    url.searchParams.set('clientId', clientId);
+    return url.toString();
+  };
+
+  const readLibrary = async () => {
+    const response = await fetch(pairedPath('/v1/library'));
+    if (!response.ok) throw new Error(`The shared library could not be loaded (HTTP ${response.status}).`);
+    const result: unknown = await response.json();
+    if (typeof result !== 'object' || result === null || !('tracks' in result) || !Array.isArray(result.tracks)) {
+      throw new Error('The music sync service returned an invalid library.');
+    }
+    return result.tracks.filter((track): track is MusicSyncLibraryTrack =>
+      typeof track?.id === 'string' &&
+      typeof track?.title === 'string' &&
+      typeof track?.artist === 'string' &&
+      (track?.kind === 'file' || track?.kind === 'url') &&
+      typeof track?.audioUrl === 'string',
+    ).map((track) => ({
+      ...track,
+      audioUrl: new URL(track.audioUrl, `${relayUrl}/`).toString(),
+    }));
+  };
+
+  const syncLibrary = async (tracks: MusicSyncLocalTrack[]) => {
+    const manifest = tracks.map((track) => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      kind: track.file ? 'file' : 'url',
+      ...(track.file
+        ? { fileFingerprint: `${track.file.size}:${track.file.type}:${track.title}:${track.file instanceof File ? track.file.lastModified : 0}` }
+        : { audioUrl: track.audioUrl }),
+    }));
+    const response = await request(
+      pairedPath('/v1/library'),
+      'PUT',
+      JSON.stringify({ tracks: manifest }),
+      'application/json',
+    );
+    if (typeof response !== 'object' || response === null || !('missingFiles' in response) ||
+      !Array.isArray(response.missingFiles)) {
+      throw new Error('The music sync service returned an invalid upload list.');
+    }
+    const missingIds = new Set(response.missingFiles.filter((id): id is string => typeof id === 'string'));
+    for (const track of tracks) {
+      if (!track.file || !missingIds.has(track.id)) continue;
+      await request(
+        pairedPath(`/v1/library/${encodeURIComponent(track.id)}/file`),
+        'PUT',
+        track.file,
+        track.file.type || 'audio/mpeg',
+      );
+    }
+    return readLibrary();
   };
 
   return {
     clientId,
     close: () => events.close(),
     lease: async (action) => {
-      const result = await post('/v1/lease', { action }) as { granted?: unknown; ownerClientId?: unknown };
+      const result = await request('/v1/lease', 'POST', JSON.stringify({ action, ...pairing, clientId }), 'application/json') as { granted?: unknown; ownerClientId?: unknown };
       return {
         granted: result.granted === true,
         ownerClientId: typeof result.ownerClientId === 'string' ? result.ownerClientId : null,
       };
     },
     sendCommand: async (command) => {
-      await post('/v1/command', { command });
+      await request('/v1/command', 'POST', JSON.stringify({ command, ...pairing, clientId }), 'application/json');
+    },
+    readLibrary,
+    syncLibrary,
+    deleteTrack: async (trackId) => {
+      await request(pairedPath(`/v1/library/${encodeURIComponent(trackId)}`), 'DELETE');
     },
   };
 }
