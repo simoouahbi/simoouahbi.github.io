@@ -40,7 +40,8 @@ export interface MusicSyncConnection {
 }
 
 export const MUSIC_SYNC_STORAGE_KEY = 'eco:music-sync-pairing';
-const relayUrl = import.meta.env.VITE_MUSIC_SYNC_URL?.trim().replace(/\/+$/, '');
+const relayUrl = (import.meta.env.VITE_MUSIC_SYNC_URL?.trim() ||
+  'https://simoouahbighalinoa-github-io.simoouahbi-483.workers.dev').replace(/\/+$/, '');
 
 export function isMusicSyncConfigured() {
   return Boolean(relayUrl);

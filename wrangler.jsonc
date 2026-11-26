@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "simoouahbighalinoa-github-io",
+  "main": "api/music-sync/cloudflare-worker.mjs",
+  "compatibility_date": "2026-11-26",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/*", "/healthz"],
+    "not_found_handling": "single-page-application"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MUSIC_ROOMS",
+        "class_name": "MusicRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MusicRoom"]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MUSIC_FILES",
+      "bucket_name": "simoouahbi-music-sync"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://adaligo.github.io,https://adamghaliouahbi.github.io,https://khadijachahmoud.github.io,https://khadijadaughter.github.io,https://khadijason.github.io,https://marociasong.github.io,https://noaouahbi.github.io,https://simoouahbi.github.io"
+  }
+}
