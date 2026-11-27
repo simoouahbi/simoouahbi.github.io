@@ -8,6 +8,7 @@ import {
   createMusicSyncClientId,
   createMusicSyncCode,
   getMusicSyncCode,
+  isMusicSyncAudioUrl,
   isMusicSyncConfigured,
   parseMusicSyncCode,
   readMusicSyncCode,
@@ -56,7 +57,9 @@ function canEnhanceTrack(track: PlayerTrack | undefined) {
   if (!track) return false;
   if (track.kind === 'device') return true;
   try {
-    return new URL(track.src, window.location.href).origin === window.location.origin;
+    const url = new URL(track.src, window.location.href);
+    return url.origin === window.location.origin ||
+      (track.kind === 'shared' && isMusicSyncAudioUrl(url.href));
   } catch {
     return false;
   }
@@ -990,6 +993,7 @@ function ConfiguredMusicPlayer() {
       <audio
         key={audioProcessingEnabled ? 'power-audio' : 'native-audio'}
         ref={audio}
+        crossOrigin={activeTrack && isMusicSyncAudioUrl(activeTrack.src) ? 'anonymous' : undefined}
         loop={tracks.length === 1}
         preload="none"
         onVolumeChange={() => {
