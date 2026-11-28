@@ -175,7 +175,6 @@ function hasAudibleVideo() {
 }
 
 export default function MusicPlayer() {
-  if (!PUBLIC_PLAYLIST.length) return null;
   return <ConfiguredMusicPlayer />;
 }
 

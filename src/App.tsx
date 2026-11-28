@@ -187,6 +187,7 @@ function HomePage() {
             <a className="primary-button" href="/timeline.html">Explore the timeline <ArrowUpRight size={16} /></a>
             <GitHubFollowButton />
             <a className="secondary-button" href="/about.html">About Simoouahbi <ArrowUpRight size={15} /></a>
+            <a className="secondary-button" href="#listen"><AudioLines size={16} /> Listen with me</a>
           </div>
           <p className="hero-caption">Personal portfolio · creative projects · stories in progress</p>
         </div>

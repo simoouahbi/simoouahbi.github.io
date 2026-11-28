@@ -5,12 +5,5 @@ export interface PublicTrack {
   audioUrl: string;
 }
 
-// Add tracks you have permission to publish. The footer player appears once this list is non-empty.
-export const PUBLIC_PLAYLIST: PublicTrack[] = [
-  {
-    id: 'marociasong',
-    title: 'Marociasong خويي',
-    artist: 'ECO Music',
-    audioUrl: '/music/marociasong.mp3',
-  },
-];
+// Add tracks you have permission to publish. Public entries and their audio files are accessible to every visitor.
+export const PUBLIC_PLAYLIST: PublicTrack[] = [];
