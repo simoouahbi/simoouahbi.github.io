@@ -39,6 +39,15 @@ const REPOSITORIES_URL = 'https://github.com/simoouahbi?tab=repositories';
 const PROTECTED_USERS_URL = '/protectedUSERS_root_path_secure/';
 const SOURCE_URL = 'https://github.com/simoouahbi/simoouahbi.github.io';
 
+function ThemeModeIcon({ className = '' }: { className?: string }) {
+  return (
+    <>
+      <img className={`brand-mode-icon brand-logo-dark ${className}`} src="/icons/LOGOO-outline-avatar-white.png" alt="" aria-hidden="true" />
+      <img className={`brand-mode-icon brand-logo-light ${className}`} src="/icons/LOGOO-outline-avatar-black.png" alt="" aria-hidden="true" />
+    </>
+  );
+}
+
 function EcoHeader({
   leftOpen,
   rightOpen,
@@ -61,7 +70,7 @@ function EcoHeader({
         <button className="icon-button toggle-button" type="button" onClick={onToggleLeft} aria-label="Toggle navigation" aria-expanded={leftOpen} title="Toggle navigation (Ctrl+B)">
           {leftOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
         </button>
-        <a className="brand" href="/" aria-label="Simoouahbi home"><span className="brand-mark">ECO</span><span className="brand-label">Simoouahbi</span></a>
+        <a className="brand" href="/" aria-label="Simoouahbi home"><span className="brand-mark" aria-hidden="true"><img className="brand-micro-icon" src="/icons/LOGOO-outline-avatar-micro-mint.png" alt="" /></span><span className="brand-label">ECO</span></a>
         <nav className="header-nav" aria-label="Main navigation">
           <a href="/">Home</a>
           <a href="/about.html">About</a>
@@ -69,8 +78,8 @@ function EcoHeader({
         </nav>
       </div>
       <div className="header-side header-side-right">
-        <a className="header-link github-link" href={REPOSITORIES_URL} target="_blank" rel="noreferrer" aria-label="View all repositories on GitHub"><Github size={16} /><span>Git repo</span></a>
-        <a className="header-link github-link" href="https://github.com/simoouahbiGHALINOA/HYPERSCALE-ecosystem" target="_blank" rel="noreferrer" aria-label="Open the ECO ecosystem repository" title="ECO repository"><span className="brand-mark" aria-hidden="true">ECO</span><span>ECO repo</span></a>
+        <a className="header-link github-link repositories-link" href={REPOSITORIES_URL} target="_blank" rel="noreferrer" aria-label="View all repositories on GitHub"><Github size={16} /><span className="repository-label">Git repo</span></a>
+        <a className="header-link github-link" href="https://github.com/simoouahbiGHALINOA/HYPERSCALE-ecosystem" target="_blank" rel="noreferrer" aria-label="Open the ECO ecosystem repository" title="ECO repository"><span className="brand-mark" aria-hidden="true"><img className="brand-micro-icon" src="/icons/LOGOO-outline-avatar-micro-mint.png" alt="" /></span><span>ECO repo</span></a>
         <a className="icon-button toggle-button" href={PROTECTED_USERS_URL} aria-label="Sign in with GitHub" title="Sign in with GitHub"><UserPlus size={19} /></a>
         <button className="icon-button toggle-button right-toggle" type="button" onClick={onToggleRight} aria-label="Toggle right sidebar" aria-expanded={rightOpen} title="Toggle right sidebar (Ctrl+M)">
           {rightOpen ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}
@@ -183,7 +192,7 @@ function HomePage() {
           </div>
           <p className="hero-subtitle">A personal space for projects, stories, and future creative work.</p>
           <div className="hero-actions">
-            <a className="primary-button" href="/timeline.html">Explore the timeline <ArrowUpRight size={16} /></a>
+            <a className="primary-button logo-button" href="/timeline.html"><ThemeModeIcon /> Explore the timeline <ArrowUpRight size={16} /></a>
             <GitHubFollowButton />
             <a className="secondary-button" href="/about.html">About Simoouahbi <ArrowUpRight size={15} /></a>
             <a className="secondary-button" href="#listen" onClick={(event) => {
@@ -251,7 +260,10 @@ function HomePage() {
 
       <section className="content-section source-section" id="contact-section">
         <div><span className="eyebrow">CONTACT</span><h2>Connect with Simoouahbi</h2></div>
-        <a className="secondary-button" href={PROFILE_URL} target="_blank" rel="noreferrer"><Github size={17} /> GitHub <ArrowUpRight size={15} /></a>
+        <div className="hero-actions">
+          <a className="secondary-button" href={PROFILE_URL} target="_blank" rel="noreferrer"><Github size={17} /> GitHub <ArrowUpRight size={15} /></a>
+          <a className="secondary-button logo-button" href="https://github.com/simoouahbiGHALINOA/HYPERSCALE-ecosystem" target="_blank" rel="noreferrer"><ThemeModeIcon /> View ECO Projects <ArrowUpRight size={15} /></a>
+        </div>
       </section>
     </main>
   );

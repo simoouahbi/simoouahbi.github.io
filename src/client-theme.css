@@ -391,3 +391,33 @@
   .page-main > .hero-section .hero-heading-row { flex-direction: column; align-items: center; }
   .page-main > .hero-section .hero-heading-row h1 { width: 100%; text-align: center; }
 }
+
+.brand-mode-icon { display: inline-block; flex: 0 0 auto; width: 1.15rem; height: 1.15rem; object-fit: contain; vertical-align: middle; }
+.brand-logo-light { display: none; }
+:root[data-theme='light'] .brand-logo-dark { display: none; }
+:root[data-theme='light'] .brand-logo-light { display: inline-block; }
+.brand-mark { position: relative; overflow: hidden; }
+.brand-mark .brand-mode-icon { position: absolute; top: 50%; left: 50%; width: 2.9rem; height: 2.9rem; margin: -1.45rem 0 0 -1.45rem; }
+.header-side-right > .repositories-link { padding: 0.18rem 0.42rem; border: 1px solid var(--accent-border); border-radius: 0.65rem; background: var(--accent-soft); }
+.repositories-link .repository-label { padding: 0.08rem 0.3rem; border-radius: 0.35rem; background: var(--bg-raised); color: var(--text); }
+.primary-button .brand-mode-icon, .secondary-button .brand-mode-icon { width: 1.05rem; height: 1.05rem; }
+.record-icon { position: relative; overflow: hidden; }
+.record-icon .record-logo { position: absolute; top: 50%; left: 50%; width: 4rem; height: 4rem; max-width: none; margin: -2rem 0 0 -2rem; object-fit: contain; animation: eco-spin 8s linear infinite; animation-play-state: paused; }
+.record-icon .record-logo-playing { animation-play-state: running; }
+.record-color-picker { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; color: var(--muted); font-size: 0.72rem; }
+.record-color-picker select { min-width: 7rem; padding: 0.25rem 0.4rem; border: 1px solid var(--accent-border); border-radius: 0.45rem; background: var(--bg-raised); color: var(--text); font: inherit; }
+.record-color-picker select:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .record-icon .record-logo { animation: none; } }
+.brand-mark { width: 1.7rem; height: 1.7rem; border-color: transparent; background: transparent; box-shadow: none; }
+.brand-mark .brand-micro-icon { display: block; width: 25px; height: 25px; object-fit: contain; }
+.logo-button, .logo-button:hover { background: transparent; border-color: currentColor; color: var(--text); box-shadow: none; backdrop-filter: none; }
+:root:not([data-theme='light']) .logo-button { color: #fff; }
+:root[data-theme='light'] .logo-button { color: #000; }
+.primary-button.logo-button .brand-mode-icon, .secondary-button.logo-button .brand-mode-icon { width: 38px; height: 38px; }
+.brand { display: inline-flex; flex: 0 0 93.05px; justify-content: space-between; width: 93.05px; min-width: 93.05px; height: auto; gap: 0.4rem; padding: 0.18rem 0.42rem; border: 1px solid var(--accent-border); border-radius: 0.65rem; background: var(--accent-soft); box-shadow: none; color: var(--muted); font-size: 0.78rem; font-weight: 600; transition: color 160ms ease; }
+.brand:hover { color: var(--text); }
+.brand .brand-mark { width: 16px; height: 16px; border: 0; }
+.brand .brand-mark .brand-micro-icon { width: 16px; height: 16px; }
+.brand-label { display: inline-flex; align-items: center; width: 55.625px; padding: 0.08rem 0.3rem; border: 0; border-radius: 0.35rem; background: var(--bg-raised); color: var(--text); font: inherit; letter-spacing: normal; line-height: inherit; }
+.header-side-right > .github-link[href*="HYPERSCALE-ecosystem"] { background: var(--accent-soft); }
+.header-side-right > .github-link[href*="HYPERSCALE-ecosystem"] .repo-badge { background: transparent; }

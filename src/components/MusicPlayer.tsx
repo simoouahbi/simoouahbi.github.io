@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Disc3, Music2, Pause, Play, Plus, Share2, Shuffle, SkipBack, SkipForward, Square, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { Music2, Pause, Play, Plus, Share2, Shuffle, SkipBack, SkipForward, Square, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { PUBLIC_PLAYLIST } from '../music/playlist';
 import { addDeviceTracks, chooseAudioFiles, readDeviceTracks, removeDeviceTrack, type StoredDeviceTrack } from '../music/library';
 import {
@@ -20,6 +20,19 @@ import {
 
 const PLAYER_KEY = 'eco-starter:player';
 const PRIVATE_URLS_KEY = 'eco-starter:private-urls';
+const RECORD_LOGO_COLOR_KEY = 'eco-starter:record-logo-color';
+const RECORD_LOGO_COLORS = ['violet', 'amber', 'brown', 'coral', 'cyan', 'emerald', 'gold', 'indigo', 'lavender', 'lime', 'magenta', 'mint', 'navy', 'rose', 'sky'] as const;
+type RecordLogoColor = typeof RECORD_LOGO_COLORS[number];
+const DEFAULT_RECORD_LOGO_COLOR: RecordLogoColor = 'mint';
+
+function readRecordLogoColor(defaultColor: RecordLogoColor): RecordLogoColor {
+  try {
+    const saved = window.localStorage.getItem(RECORD_LOGO_COLOR_KEY);
+    return RECORD_LOGO_COLORS.find((color) => color === saved) ?? defaultColor;
+  } catch {
+    return defaultColor;
+  }
+}
 
 interface PlayerTrack {
   id: string;
@@ -197,6 +210,7 @@ function ConfiguredMusicPlayer() {
   const [sharedTracks, setSharedTracks] = useState<MusicSyncLibraryTrack[]>([]);
   const [activeId, setActiveId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [recordLogoColor, setRecordLogoColor] = useState<RecordLogoColor>(() => readRecordLogoColor(DEFAULT_RECORD_LOGO_COLOR));
   const [isReady, setIsReady] = useState(false);
   const [needsResume, setNeedsResume] = useState(false);
   const [volumePercent, setVolumePercent] = useState(100);
@@ -260,6 +274,19 @@ function ConfiguredMusicPlayer() {
   const volumeGain = 1 + volumeBoost * 9;
   const volumeBass = volumeBoost * 18;
   activeTrackRef.current = activeTrack;
+  const handleRecordLogoColorChange = (value: string) => {
+    const color = RECORD_LOGO_COLORS.find((option) => option === value);
+    if (!color) {
+      setMessage('Choose a valid logo color.');
+      return;
+    }
+    setRecordLogoColor(color);
+    try {
+      window.localStorage.setItem(RECORD_LOGO_COLOR_KEY, color);
+    } catch {
+      setMessage('Your browser could not save the logo color.');
+    }
+  };
 
   const switchToNativePlayback = useCallback(() => {
     const element = audio.current;
@@ -1062,6 +1089,12 @@ function ConfiguredMusicPlayer() {
             <div>
               <span className="eyebrow">YOUR LISTENING SPACE</span>
               <h2>Music library</h2>
+              <label className="record-color-picker">
+                <span>Logo color</span>
+                <select value={recordLogoColor} onChange={(event) => handleRecordLogoColorChange(event.currentTarget.value)}>
+                  {RECORD_LOGO_COLORS.map((color) => <option key={color} value={color}>{color[0].toUpperCase() + color.slice(1)}</option>)}
+                </select>
+              </label>
             </div>
             <button type="button" className="icon-button" aria-label="Close music library" onClick={() => setIsOpen(false)}><X size={18} /></button>
           </div>
@@ -1158,7 +1191,7 @@ function ConfiguredMusicPlayer() {
         </section>
       )}
       <button type="button" className="now-playing" onClick={() => setIsOpen((open) => !open)} aria-expanded={isOpen} aria-label="Open music library">
-        <span className="record-icon"><Disc3 size={19} /></span>
+        <span className="record-icon"><img className={`record-logo${isPlaying ? ' record-logo-playing' : ''}`} src={`/icons/LOGOO-outline-avatar-micro-${recordLogoColor}.png`} alt="" aria-hidden="true" /></span>
         <span className="now-playing-text"><strong>{activeTrack?.title ?? 'Your music'}</strong><small>{activeTrack?.artist ?? (isReady ? 'Add your first track' : 'Loading library…')}</small></span>
       </button>
       <div className="player-controls">
