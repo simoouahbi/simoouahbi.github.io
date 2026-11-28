@@ -1,6 +1,6 @@
 {
   "method": "first-party source file bytes",
-  "totalSourceBytes": 286746,
+  "totalSourceBytes": 296361,
   "languages": [
     {
       "name": "Rust",
@@ -8,7 +8,7 @@
       "starterDirectory": "starters/rust",
       "fileCount": 1,
       "sourceBytes": 3042,
-      "actualPercent": 1.1,
+      "actualPercent": 1,
       "equalPercent": 12.5
     },
     {
@@ -17,7 +17,7 @@
       "starterDirectory": "starters/go",
       "fileCount": 2,
       "sourceBytes": 2721,
-      "actualPercent": 1,
+      "actualPercent": 0.9,
       "equalPercent": 12.5
     },
     {
@@ -26,16 +26,16 @@
       "starterDirectory": "starters/python",
       "fileCount": 4,
       "sourceBytes": 6244,
-      "actualPercent": 2.2,
+      "actualPercent": 2.1,
       "equalPercent": 12.5
     },
     {
       "name": "TypeScript",
       "extension": ".ts, .tsx",
       "starterDirectory": "starters/typescript",
-      "fileCount": 27,
-      "sourceBytes": 151810,
-      "actualPercent": 52.9,
+      "fileCount": 28,
+      "sourceBytes": 160878,
+      "actualPercent": 54.3,
       "equalPercent": 12.5
     },
     {
@@ -44,7 +44,7 @@
       "starterDirectory": "starters/javascript",
       "fileCount": 8,
       "sourceBytes": 43387,
-      "actualPercent": 15.1,
+      "actualPercent": 14.6,
       "equalPercent": 12.5
     },
     {
@@ -61,8 +61,8 @@
       "extension": ".css",
       "starterDirectory": "starters/css",
       "fileCount": 5,
-      "sourceBytes": 75197,
-      "actualPercent": 26.2,
+      "sourceBytes": 75744,
+      "actualPercent": 25.6,
       "equalPercent": 12.5
     },
     {
