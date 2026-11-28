@@ -193,7 +193,11 @@ function HomePage() {
           <p className="hero-caption">Personal portfolio · creative projects · stories in progress</p>
         </div>
       </section>
-      <ContributionWeekEmbed site="simoouahbi" />
+      <ContributionWeekEmbed
+        site="simoouahbi"
+        repository="simoouahbi/simoouahbi.github.io"
+        branch="main"
+      />
       {isAvatarOpen && (
         <div
           className="avatar-lightbox"
